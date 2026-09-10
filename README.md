@@ -2,6 +2,22 @@
 
 > Carteirinha digital de saúde do pet + lembretes automáticos, para clínicas veterinárias e petshops.
 
+## English summary
+
+**PetVet is an early-stage B2B2C MVP.** Veterinary clinics and pet shops register pets and their health history, and the system is designed to send automatic reminders (vaccines, deworming, check-ups) to pet owners. The full documentation below is in Portuguese.
+
+| | |
+|---|---|
+| **Works today** | CRUD for clinics, staff and pets · staff login with JWT · landing page with plans |
+| **Not built yet** | WhatsApp reminders (no integration yet) · pet-owner login · profile/dashboard endpoints return mocked data |
+| **Known blocking issues** | Sign-up fails against the real MySQL schema (`role = "USER"` isn't allowed, and the required `clinic_id` is missing) · two divergent role models · `POST /api/marketplace/providers` requires no authentication · logout tokens are kept only in memory · default JWT secret in code · `ddl-auto: update` · landing-page traction numbers are fictional placeholders · CORS allows only localhost |
+| **Business status** | No customer discovery interviews yet; pricing is a placeholder |
+| **Stack** | Java 21 + Spring Boot 3.5 (Spring Security, JPA) · MySQL 8 · React + Vite + TypeScript |
+
+The issues are documented on purpose: the goal is an honest picture of the MVP's current state, not a demo that looks finished.
+
+---
+
 Este README documenta o **estado atual do MVP** (produto + tecnologia), a ideia de negócio por trás dele e o que ainda falta para ele funcionar de ponta a ponta. O objetivo é que qualquer pessoa — sócio, novo colaborador, investidor ou o próprio time em três meses — consiga entender o projeto sem precisar de explicação verbal.
 
 ---
