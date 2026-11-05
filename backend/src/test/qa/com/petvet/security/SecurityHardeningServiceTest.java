@@ -25,9 +25,11 @@ class SecurityHardeningServiceTest {
         assertTrue(service.isBlocked("user@example.com", "127.0.0.1"));
     }
 
+    private static final String TEST_SECRET = "test-secret-key-with-at-least-32-bytes";
+
     @Test
     void refreshTokenServiceGeneratesAndValidatesToken() {
-        RefreshTokenService service = new RefreshTokenService();
+        RefreshTokenService service = new RefreshTokenService(TEST_SECRET);
         String token = service.generateToken("user@example.com");
 
         assertNotNull(token);
@@ -41,7 +43,7 @@ class SecurityHardeningServiceTest {
 
     @Test
     void refreshTokenServiceRejectsRevokedTokens() {
-        RefreshTokenService service = new RefreshTokenService();
+        RefreshTokenService service = new RefreshTokenService(TEST_SECRET);
         String token = service.generateToken("user@example.com");
 
         service.revokeToken(token);
@@ -51,9 +53,7 @@ class SecurityHardeningServiceTest {
 
     @Test
     void jwtServiceRejectsRevokedAccessTokens() {
-        JwtService service = new JwtService();
-        service.setJwtSecretForTest("test-secret-key-with-at-least-32-bytes");
-        service.setJwtExpirationMsForTest(60000L);
+        JwtService service = new JwtService(TEST_SECRET, 60000L);
 
         UserDetails user = new org.springframework.security.core.userdetails.User(
                 "user@example.com",
@@ -65,5 +65,20 @@ class SecurityHardeningServiceTest {
         service.revokeToken(token);
 
         assertFalse(service.isTokenValid(token, user));
+    }
+
+    @Test
+    void servicesRefuseToStartWithoutSecret() {
+        var accessError = assertThrows(IllegalStateException.class, () -> new JwtService("", 60000L));
+        var refreshError = assertThrows(IllegalStateException.class, () -> new RefreshTokenService(null));
+
+        assertTrue(accessError.getMessage().contains("JWT_SECRET"));
+        assertTrue(refreshError.getMessage().contains("JWT_REFRESH_SECRET"));
+    }
+
+    @Test
+    void servicesRefuseSecretsShorterThan32Bytes() {
+        assertThrows(IllegalStateException.class, () -> new JwtService("curto-demais", 60000L));
+        assertThrows(IllegalStateException.class, () -> new RefreshTokenService("petvet-jwt-signing-key-2025"));
     }
 }
