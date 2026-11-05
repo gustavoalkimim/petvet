@@ -1,36 +1,34 @@
 package com.petvet.controller;
 
 import com.petvet.model.User;
-import com.petvet.repository.UserRepository;
 import com.petvet.security.JwtService;
 import com.petvet.security.LoginAttemptService;
 import com.petvet.security.RefreshTokenService;
 import com.petvet.security.SecurityAuditService;
 import com.petvet.service.CustomUserDetailsService;
+import com.petvet.service.RegistrationService;
+import com.petvet.service.RegistrationService.RegistrationException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final RegistrationService registrationService;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
@@ -38,16 +36,14 @@ public class AuthController {
     private final CustomUserDetailsService customUserDetailsService;
 
     public AuthController(AuthenticationManager authenticationManager,
-                         UserRepository userRepository,
-                         PasswordEncoder passwordEncoder,
+                         RegistrationService registrationService,
                          JwtService jwtService,
                          RefreshTokenService refreshTokenService,
                          LoginAttemptService loginAttemptService,
                          SecurityAuditService securityAuditService,
                          CustomUserDetailsService customUserDetailsService) {
         this.authenticationManager = authenticationManager;
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.registrationService = registrationService;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.loginAttemptService = loginAttemptService;
@@ -57,31 +53,17 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        String normalizedEmail = request.email.trim().toLowerCase();
-
-        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
-            return ResponseEntity.badRequest().body(new AuthResponse(null, null, "Email already registered."));
+        User user;
+        try {
+            user = registrationService.register(
+                request.name, request.email, request.password, request.clinicName, request.clinicDocument);
+        } catch (RegistrationException ex) {
+            return ResponseEntity.badRequest().body(new AuthResponse(null, null, ex.getMessage()));
         }
 
-        if (!isStrongPassword(request.password)) {
-            return ResponseEntity.badRequest().body(
-                new AuthResponse(null, null,
-                    "Password must contain at least 12 characters, including uppercase, lowercase, number and symbol.")
-            );
-        }
-
-        User user = new User();
-        user.setName(request.name.trim());
-        user.setEmail(normalizedEmail);
-        user.setPasswordHash(passwordEncoder.encode(request.password));
-        user.setRole("USER");
-        user.setStatus("ACTIVE");
-        user.setCreatedAt(LocalDateTime.now());
-        userRepository.save(user);
-
-        UserDetails userDetails = customUserDetailsService.loadUserByUsername(normalizedEmail);
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(user.getEmail());
         String accessToken = jwtService.generateToken(userDetails);
-        String refreshToken = refreshTokenService.generateToken(normalizedEmail);
+        String refreshToken = refreshTokenService.generateToken(user.getEmail());
         return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken, "Registration successful."));
     }
 
@@ -165,29 +147,27 @@ public class AuthController {
         return request.getRemoteAddr();
     }
 
-    private boolean isStrongPassword(String password) {
-        if (password == null || password.length() < 12) {
-            return false;
-        }
-
-        boolean hasUpper = password.chars().anyMatch(Character::isUpperCase);
-        boolean hasLower = password.chars().anyMatch(Character::isLowerCase);
-        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
-        boolean hasSymbol = password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
-
-        return hasUpper && hasLower && hasDigit && hasSymbol;
-    }
-
     public static class RegisterRequest {
         @NotBlank
+        @Size(max = 150)
         public String name;
 
         @NotBlank
         @Email
+        @Size(max = 150)
         public String email;
 
         @NotBlank
         public String password;
+
+        @NotBlank
+        @Size(max = 150)
+        public String clinicName;
+
+        /** CPF ou CNPJ, com ou sem pontuação. */
+        @NotBlank
+        @Size(max = 30)
+        public String clinicDocument;
     }
 
     public static class LoginRequest {
