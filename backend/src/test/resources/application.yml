@@ -17,3 +17,5 @@ app:
     secret: test-access-token-secret-with-at-least-32-bytes
     refresh-secret: test-refresh-token-secret-with-at-least-32-bytes
     expiration-ms: 60000
+  cors:
+    allowed-origins: http://localhost:5173

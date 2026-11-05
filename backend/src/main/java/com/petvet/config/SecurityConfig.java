@@ -3,6 +3,7 @@ package com.petvet.config;
 import com.petvet.security.IpRateLimitingFilter;
 import com.petvet.security.JwtAuthenticationFilter;
 import com.petvet.service.CustomUserDetailsService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -31,10 +32,11 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationFilter jwtAuthenticationFilter,
                                                    IpRateLimitingFilter ipRateLimitingFilter,
-                                                   AuthenticationProvider authenticationProvider) throws Exception {
+                                                   AuthenticationProvider authenticationProvider,
+                                                   CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .headers(headers -> headers
                 .httpStrictTransportSecurity(hsts -> hsts
@@ -56,15 +58,26 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Origens vêm de {@code app.cors.allowed-origins} (variável CORS_ALLOWED_ORIGINS, separada por vírgula).
+     * Com credenciais ligadas, "*" seria refletir qualquer site; por isso é recusado na subida.
+     */
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
+        List<String> origins = allowedOrigins.stream()
+            .map(String::trim)
+            .filter(origin -> !origin.isEmpty())
+            .toList();
+        if (origins.isEmpty()) {
+            throw new IllegalStateException("CORS_ALLOWED_ORIGINS must list at least one origin.");
+        }
+        if (origins.contains("*")) {
+            throw new IllegalStateException("CORS_ALLOWED_ORIGINS cannot be \"*\" because credentials are allowed.");
+        }
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000"
-        ));
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(true);
