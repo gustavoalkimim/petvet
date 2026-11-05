@@ -72,7 +72,10 @@ public class ProductPlanCatalog {
         return plans.get(tier);
     }
 
+    // Map.of não garante ordem de iteração; a ordem dos planos segue o enum (FREE, PRO, PREMIUM).
     public java.util.List<ProductPlan> getAllPlans() {
-        return java.util.List.copyOf(plans.values());
+        return java.util.Arrays.stream(ProductPlanTier.values())
+                .map(plans::get)
+                .toList();
     }
 }

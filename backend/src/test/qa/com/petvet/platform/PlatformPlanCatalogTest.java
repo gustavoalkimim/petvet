@@ -30,4 +30,13 @@ class PlatformPlanCatalogTest {
         assertTrue(pro.getMetrics().contains("Retenção e performance por unidade"));
         assertTrue(pro.getFeatures().contains("Dashboard de métricas avançadas"));
     }
+
+    @Test
+    void allPlansFollowTierOrder() {
+        ProductPlanCatalog catalog = new ProductPlanCatalog();
+
+        var tiers = catalog.getAllPlans().stream().map(ProductPlan::getTier).toList();
+
+        assertEquals(java.util.List.of(ProductPlanTier.values()), tiers);
+    }
 }
