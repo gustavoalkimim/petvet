@@ -1,11 +1,13 @@
 package com.petvet.controller;
 
 import com.petvet.model.Clinic;
+import com.petvet.security.AuthzService;
 import com.petvet.service.ClinicService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,9 @@ class ClinicControllerTest {
 
     @Mock
     private ClinicService clinicService;
+
+    @Spy
+    private AuthzService authzService = new AuthzService();
 
     @InjectMocks
     private ClinicController clinicController;

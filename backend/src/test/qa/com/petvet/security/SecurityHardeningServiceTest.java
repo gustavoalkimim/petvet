@@ -1,6 +1,7 @@
 package com.petvet.security;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -51,7 +52,7 @@ class SecurityHardeningServiceTest {
     @Test
     void jwtServiceRejectsRevokedAccessTokens() {
         JwtService service = new JwtService();
-        service.setJwtSecretForTest("test-secret-key-1234567890");
+        service.setJwtSecretForTest("test-secret-key-with-at-least-32-bytes");
         service.setJwtExpirationMsForTest(60000L);
 
         UserDetails user = new org.springframework.security.core.userdetails.User(
