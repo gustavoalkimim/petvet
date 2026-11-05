@@ -8,9 +8,10 @@
 
 | | |
 |---|---|
-| **Works today** | CRUD for clinics, staff and pets · staff login with JWT · landing page with plans |
+| **Works today** | Clinic sign-up (creates the clinic and its first staff user) · CRUD for clinics, staff and pets · staff login with JWT · landing page with plans · 46 automated backend tests running on H2 |
 | **Not built yet** | WhatsApp reminders (no integration yet) · pet-owner login · profile/dashboard endpoints return mocked data |
-| **Known blocking issues** | Sign-up fails against the real MySQL schema (`role = "USER"` isn't allowed, and the required `clinic_id` is missing) · two divergent role models · `POST /api/marketplace/providers` requires no authentication · logout tokens are kept only in memory · default JWT secret in code · `ddl-auto: update` · landing-page traction numbers are fictional placeholders · CORS allows only localhost |
+| **Known blocking issues** | Two divergent role models · logout tokens are kept only in memory · `ddl-auto: update` · landing-page traction numbers are fictional placeholders |
+| **Fixed (2026-11-05)** | Backend build · sign-up against the real schema · marketplace provider creation restricted to ADMIN · JWT secrets without defaults · CORS origins configurable · plans returned in a stable order |
 | **Business status** | No customer discovery interviews yet; pricing is a placeholder |
 | **Stack** | Java 21 + Spring Boot 3.5 (Spring Security, JPA) · MySQL 8 · React + Vite + TypeScript |
 
@@ -64,6 +65,7 @@ Nenhuma entrevista de descoberta com clínica ou petshop foi realizada até o mo
 
 ### O que funciona hoje
 
+- Cadastro público de clínica: `POST /api/auth/register` cria a clínica e o primeiro usuário dela (papel `EMPLOYEE`)
 - Cadastro de clínica, funcionário e pet (CRUD básico)
 - Autenticação de funcionário de clínica via login/senha + JWT
 - Landing page com apresentação do produto e planos
@@ -76,15 +78,19 @@ Nenhuma entrevista de descoberta com clínica ou petshop foi realizada até o mo
 
 ### Bugs bloqueantes conhecidos (auditoria técnica)
 
-- **Cadastro de usuário quebra contra o banco real**: o backend grava `role = "USER"`, mas o banco só aceita `ADMIN`, `EMPLOYEE` ou `SUPPORT`. Isso impede qualquer cadastro novo.
-- O mesmo cadastro não vincula `clinic_id`, que é obrigatório no banco — segundo erro garantido no mesmo fluxo.
-- Existem dois modelos de "papel de usuário" divergentes no código (um usado de verdade, outro desconectado/morto).
-- `POST /api/marketplace/providers` não exige autenticação — qualquer um pode criar um prestador de serviço no marketplace.
+- Existem dois modelos de "papel de usuário" divergentes no código: `User.role` (texto, usado de verdade) e o enum `UserRole` (desconectado).
 - Tokens de logout ficam só em memória: reiniciar o servidor "reativa" tokens que deveriam estar revogados; não funciona com mais de uma instância rodando.
-- Segredos de JWT com valor padrão fixo no código-fonte (risco se a variável de ambiente não for configurada em produção).
 - `ddl-auto: update` ativo no Hibernate — não deve ser usado em produção.
 - Números de tração exibidos na landing page (ex: "1.200+ pets ativos") são **fictícios**, usados como placeholder visual — precisam ser removidos ou deixados claramente como exemplo antes de qualquer uso externo.
-- CORS liberado apenas para `localhost` — não funciona fora do ambiente local.
+
+### Corrigido em 2026-11-05
+
+- O backend não compilava (`SC_TOO_MANY_REQUESTS` não existe no Servlet 6.0 do Spring Boot 3.5) e a suíte de testes também não; agora os dois compilam e os testes rodam com H2, sem MySQL.
+- **Cadastro**: gravava `role = "USER"` (recusado pelo banco) e não vinculava `clinic_id` (obrigatório). Agora cria a clínica e o usuário na mesma transação, com papel `EMPLOYEE`. Não é `ADMIN` de propósito: no `AuthzService`, `ADMIN` acessa qualquer clínica.
+- `POST /api/marketplace/providers` aceitava qualquer usuário logado; agora exige `ADMIN`.
+- Os segredos de JWT tinham valor padrão no código; agora `JWT_SECRET` e `JWT_REFRESH_SECRET` são obrigatórios (mínimo de 32 bytes) e a aplicação não sobe sem eles.
+- CORS fixo em `localhost`; agora as origens vêm de `CORS_ALLOWED_ORIGINS`.
+- `/api/plans` devolvia os planos em ordem aleatória; agora a ordem é sempre FREE, PRO, PREMIUM.
 
 ### Estado visual
 
@@ -116,9 +122,14 @@ docs/       → documentação técnica (arquitetura)
 # Banco de dados
 # Rodar os scripts em database/mysql/schema/ contra uma instância MySQL 8
 
-# Backend
+# Backend (Maven 3.9+ e JDK 21 ou mais novo)
 cd backend
-./mvnw spring-boot:run
+export JWT_SECRET="um-segredo-aleatorio-com-pelo-menos-32-bytes"
+export JWT_REFRESH_SECRET="outro-segredo-aleatorio-com-pelo-menos-32-bytes"
+mvn spring-boot:run
+
+# Testes do backend (usam H2 em memória, não precisam de MySQL)
+mvn test
 
 # Frontend
 cd frontend
@@ -126,11 +137,18 @@ npm install
 npm run dev
 ```
 
-> Atenção: com os bugs de cadastro listados acima, o fluxo de criar uma nova conta/clínica **vai falhar** contra um banco MySQL real até que a inconsistência de `role`/`clinic_id` seja corrigida.
+| Variável | Obrigatória | Padrão | Para quê |
+|---|---|---|---|
+| `JWT_SECRET` | sim | — | Assina o token de acesso (mínimo de 32 bytes) |
+| `JWT_REFRESH_SECRET` | sim | — | Assina o refresh token (mínimo de 32 bytes; use um valor diferente do anterior) |
+| `CORS_ALLOWED_ORIGINS` | não | portas locais 5173 e 3000 | Origens do front-end, separadas por vírgula; `*` é recusado |
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | não | MySQL local | Conexão com o banco |
+
+Para gerar um segredo: `openssl rand -base64 48`.
 
 ## 6. Próximos passos recomendados
 
-1. Corrigir os bugs bloqueantes de cadastro (role/clinic_id) antes de qualquer teste com usuário real.
+1. Persistir a revogação de tokens (banco ou Redis) e unificar os dois modelos de papel de usuário.
 2. Implementar de fato a integração com WhatsApp — é o diferencial do produto e hoje não existe.
 3. Adicionar autenticação para o tutor (pet owner), não só para funcionário de clínica.
 4. Redesenhar a landing page com identidade visual própria (paleta de marca, interação de scroll) antes de mostrar a qualquer parceiro externo.
