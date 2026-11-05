@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -51,6 +52,7 @@ class MarketplaceControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void createProviderReturnsCreatedStatus() throws Exception {
         mockMvc.perform(post("/api/marketplace/providers")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -68,6 +70,25 @@ class MarketplaceControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "EMPLOYEE")
+    void createProviderIsForbiddenForClinicEmployee() throws Exception {
+        mockMvc.perform(post("/api/marketplace/providers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testProvider)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void createProviderIsRejectedWithoutAuthentication() throws Exception {
+        mockMvc.perform(post("/api/marketplace/providers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(testProvider)))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void getProvidersByCityFiltersCorrectly() throws Exception {
         mockMvc.perform(post("/api/marketplace/providers")
                 .contentType(MediaType.APPLICATION_JSON)

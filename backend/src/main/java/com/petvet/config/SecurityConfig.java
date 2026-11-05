@@ -5,6 +5,7 @@ import com.petvet.security.JwtAuthenticationFilter;
 import com.petvet.service.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -43,6 +44,8 @@ public class SecurityConfig {
                     .policyDirectives("default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'")))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/actuator/health").permitAll()
+                // O marketplace é curado pela plataforma: clínicas leem, só a equipe (ADMIN) cadastra prestadores.
+                .requestMatchers(HttpMethod.POST, "/api/marketplace/providers").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .authenticationProvider(authenticationProvider)
             .addFilterBefore(ipRateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
